@@ -1,56 +1,100 @@
 import requests
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
-
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-def generate_itinerary(destinations, days, budget, preferences):
+
+def clean_text(text):
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"__(.*?)__", r"\1", text)
+    return text
+
+
+def generate_itinerary(boarding_point, destinations, days, budget, preferences, optimize_budget):
 
     url = "https://openrouter.ai/api/v1/chat/completions"
 
+    optimization_rules = ""
+    if optimize_budget:
+        optimization_rules = """
+STRICT BUDGET MODE:
+- Prefer trains (Sleeper/3AC) instead of flights.
+- Prefer buses over taxis.
+- Hotels must be under ₹1200 per night.
+- Suggest hostels if needed.
+- Prefer metro/local transport.
+- Suggest street food/local eateries.
+"""
+
     prompt = f"""
-    You are a smart AI travel planner.
+You are a professional travel planner.
 
-    Plan a {days}-day trip for:
-    {", ".join(destinations)}
+Create a detailed {days}-day itinerary.
 
-    Budget: ₹{budget}
-    Preferences: {preferences}
+Boarding City: {boarding_point}
+Destinations: {", ".join(destinations)}
+Total Budget: ₹{budget}
+Preferences: {preferences}
 
-    Provide:
-    - Day-wise itinerary (Day 1 to Day {days})
-    - Budget-friendly suggestions
-    - Travel between cities
-    - Food and attractions
-    """
+{optimization_rules}
+
+Rules:
+1. Total cost must NOT exceed ₹{budget}.
+2. Provide daily Morning, Afternoon, Evening plan.
+3. Provide daily approximate cost.
+4. Provide full cost breakdown at end.
+5. Do NOT use markdown symbols like ** or __.
+6. Use plain text formatting only.
+
+Format:
+
+Day X - City Name
+
+Morning:
+- Activity
+
+Afternoon:
+- Activity
+
+Evening:
+- Activity
+
+Daily Approximate Cost: ₹____
+
+After all days:
+
+TOTAL COST BREAKDOWN:
+Transport:
+Stay:
+Food:
+Attractions:
+Final Estimated Total Cost: ₹____
+"""
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {API_KEY.strip()}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "AI Travel Planner"
     }
 
     data = {
-        "model": "mistralai/mistral-7b-instruct",
+        "model": "meta-llama/llama-3-8b-instruct",
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7
+        "temperature": 0.6
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=data)
+    response = requests.post(url, headers=headers, json=data)
 
-        print("Status:", response.status_code)
-        print("Response:", response.text)
+    if response.status_code != 200:
+        return f"API Error: {response.text}"
 
-        if response.status_code != 200:
-            return f"❌ API Error:\n{response.text}"
+    result = response.json()
+    itinerary = result["choices"][0]["message"]["content"]
 
-        result = response.json()
-
-        return result['choices'][0]['message']['content']
-
-    except Exception as e:
-        return f"Error: {e}"
+    return clean_text(itinerary)

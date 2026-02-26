@@ -1,51 +1,44 @@
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-import markdown2
-import re
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.lib.pagesizes import A4
 from io import BytesIO
 
-
-def clean_markdown(md_text: str) -> str:
-    """
-    Convert markdown to clean readable plain text
-    """
-    html = markdown2.markdown(md_text)
-
-    # Remove HTML tags
-    clean_text = re.sub('<[^<]+?>', '', html)
-
-    # Fix extra newlines
-    clean_text = clean_text.replace('\n\n', '\n')
-
-    return clean_text
-
-
-def create_pdf(text):
+def generate_pdf(itinerary_text):
 
     buffer = BytesIO()
 
-    cleaned_text = clean_markdown(text)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
 
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
 
-    x_margin = 1 * inch
-    y_position = height - 1 * inch
+    styles = getSampleStyleSheet()
 
-    c.setFont("Helvetica", 10)
+    normal_style = ParagraphStyle(
+        'NormalStyle',
+        parent=styles['Normal'],
+        fontName='STSong-Light',
+        fontSize=11,
+        leading=15,
+    )
 
-    for line in cleaned_text.split("\n"):
+    itinerary_text = itinerary_text.replace("₹", "Rs. ")
 
-        if y_position < 1 * inch:
-            c.showPage()
-            c.setFont("Helvetica", 10)
-            y_position = height - 1 * inch
+    elements = []
+    for line in itinerary_text.split("\n"):
+        elements.append(Paragraph(line, normal_style))
+        elements.append(Spacer(1, 0.15 * inch))
 
-        c.drawString(x_margin, y_position, line)
-        y_position -= 14
-
-    c.save()
+    doc.build(elements)
 
     buffer.seek(0)
-    return buffer.getvalue()
+    return buffer

@@ -1,90 +1,78 @@
 import streamlit as st
 from planner import generate_itinerary
-from map_utils import create_map
-from pdf_utils import create_pdf
-from streamlit_folium import st_folium
+from pdf_utils import generate_pdf
+from map_utils import get_coordinates
 
 st.set_page_config(page_title="AI Travel Planner", layout="wide")
 
 st.title("🌍 AI Travel Planner")
 
-
-# INPUTS
-
-
-destinations = st.text_input(
-    "Enter destinations (comma separated)", 
-    "Goa, Mumbai"
-)
-
-days = st.number_input("Number of days", min_value=1, value=5)
-
-budget = st.number_input("Budget (₹)", min_value=1000, value=10000)
-
-preferences = st.selectbox(
-    "Travel Style",
-    ["Budget", "Luxury", "Adventure", "Food", "Relaxation", "Mixed"]
-)
-
-destination_list = [d.strip() for d in destinations.split(",") if d.strip()]
-
-
-# SESSION STATE
-
-
+# Initialize session state
 if "itinerary" not in st.session_state:
-    st.session_state.itinerary = ""
+    st.session_state.itinerary = None
 
+if "cities" not in st.session_state:
+    st.session_state.cities = None
+
+# USER INPUT
+
+boarding_point = st.text_input("Enter Boarding City")
+
+destinations_input = st.text_input("Enter Destinations (comma separated)")
+
+days = st.number_input("Number of Days", min_value=1, max_value=30, value=3)
+
+budget = st.text_input("Total Budget (₹)")
+
+preferences = st.text_area("Travel Preferences")
+
+optimize_budget = st.checkbox("💰 Optimize for Cheapest Travel")
 
 # GENERATE BUTTON
 
+if st.button("Generate Itinerary"):
 
-if st.button("Generate Plan"):
-
-    if not destination_list:
-        st.warning("Please enter at least one destination")
+    if not boarding_point or not destinations_input:
+        st.warning("Please enter boarding city and destinations.")
     else:
-        with st.spinner("Generating itinerary using AI..."):
-            result = generate_itinerary(
-                destination_list, days, budget, preferences
+        destinations = [d.strip() for d in destinations_input.split(",")]
+
+        with st.spinner("Generating itinerary..."):
+            itinerary = generate_itinerary(
+                boarding_point,
+                destinations,
+                days,
+                budget,
+                preferences,
+                optimize_budget
             )
-            st.session_state.itinerary = result
 
-
-# OUTPUT SECTION
+        # Save to session state
+        st.session_state.itinerary = itinerary
+        st.session_state.cities = [boarding_point] + destinations
 
 
 if st.session_state.itinerary:
 
-    st.subheader("📋 Your Travel Plan")
+    st.subheader("🧳 Your Itinerary")
+    st.text(st.session_state.itinerary)
 
-    # ✅ Render Markdown properly (no ### or ** visible)
-    st.markdown(st.session_state.itinerary)
+    # PDF Download
+    pdf_file = generate_pdf(st.session_state.itinerary)
 
+    st.download_button(
+        label="📄 Download Itinerary PDF",
+        data=pdf_file,
+        file_name="Travel_Itinerary.pdf",
+        mime="application/pdf"
+    )
 
-    # MAP
+    # Map
+    st.subheader("🗺 Travel Route Map")
 
+    df = get_coordinates(st.session_state.cities)
 
-    st.subheader("🗺️ Route Map")
-    try:
-        map_obj = create_map(destination_list)
-        st_folium(map_obj, width=700, height=500)
-    except Exception as e:
-        st.warning(f"Map could not be loaded: {e}")
-
-
-    # PDF DOWNLOAD
-
-
-    try:
-        pdf_bytes = create_pdf(st.session_state.itinerary)
-
-        st.download_button(
-            label="📄 Download PDF",
-            data=pdf_bytes,
-            file_name="Travel_Itinerary.pdf",
-            mime="application/pdf"
-        )
-
-    except Exception as e:
-        st.error(f"PDF generation failed: {e}")
+    if not df.empty:
+        st.map(df)
+    else:
+        st.warning("Map could not load locations.")
