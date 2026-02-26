@@ -28,7 +28,7 @@
 <h2>Tech Stack</h2>
 <ul>
   <li><strong>Language:</strong> Python</li>
-  <li><strong>Backend:</strong> Flask</li>
+  <li><strong>Backend:</strong> Streamlit</li>
   <li><strong>AI API:</strong> OpenRouter</li>
   <li><strong>PDF Generation:</strong> ReportLab</li>
   <li><strong>Markdown Processing:</strong> markdown2</li>
@@ -67,10 +67,12 @@
 <h3>3. Install Dependencies</h3>
 <pre><code>pip install -r requirements.txt</code></pre>
 
+</pre><h3>4. Create a <code>.env</code> File for API Key</h3> <pre><code># In the project root, create a file named .env # Add your OpenAI API key like this: OPENROUTER_API_KEY=your_openrouterai_api_key_here </code></pre> <hr> <h2>Run the Project</h2> <pre><code>python app.py</code></pre>
+
 <hr>
 
 <h2>Run the Project</h2>
-<pre><code>python app.py</code></pre>
+<pre><code> streamlit run app.py</code></pre>
 
 <p>
   Once the server is running, submit travel details and the application will
